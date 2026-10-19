@@ -1,0 +1,54 @@
+﻿# =============================================================================
+# AI-Driven Network Monitor — .gitignore
+# =============================================================================
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Generated model + database files ─────────────────────────────────────────
+# These are large binary outputs — regenerate with train_synthetic or evaluate_cicids.py
+*.joblib
+*.db
+*.sqlite
+*.sqlite3
+
+# ── flow_eval: large dataset CSVs (download separately, never commit) ─────────
+flow_eval/*.csv
+# Allow the mock CSVs if you ever want to commit them for smoke-testing:
+# !flow_eval/mock_monday.csv
+# !flow_eval/mock_friday_ddos.csv
+
+# ── flow_eval: generated output files ────────────────────────────────────────
+flow_eval/predictions.csv
+flow_eval/results.csv
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ── OS artefacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Jupyter (if notebooks are ever added) ────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Distribution / packaging ─────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
