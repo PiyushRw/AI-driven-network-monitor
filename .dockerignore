@@ -1,0 +1,31 @@
+﻿# Version control
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Saved models & databases (mount at runtime if needed)
+*.joblib
+*.db
+
+# CICIDS2017 CSVs — large files, mount as a volume instead
+flow_eval/*.csv
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# README / docs (not needed inside the image)
+README.md
+flow_eval/README.md
