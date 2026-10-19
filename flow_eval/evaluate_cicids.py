@@ -27,6 +27,7 @@ BASE = ["Flow Duration", "Total Fwd Packets", "Total Backward Packets",
         "Flow Bytes/s", "Flow Packets/s", "Fwd Packet Length Mean", "Bwd Packet Length Mean",
         "Flow IAT Mean", "Fwd IAT Mean", "SYN Flag Count", "ACK Flag Count", "PSH Flag Count",
         "RST Flag Count", "Average Packet Size", "Init_Win_bytes_forward", "Init_Win_bytes_backward"]
+BENIGN_NAMES = {"BENIGN", "NORMAL", "NORMAL TRAFFIC", "0"}
 ENGINEERED = ["fwd_bwd_pkt_ratio", "bytes_per_packet", "resp_byte_ratio", "syn_minus_ack"]
 
 
@@ -39,6 +40,10 @@ def load(path):
     df["Label"] = df["Label"].astype(str).str.strip()
     df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=BASE).reset_index(drop=True)
     return df
+
+
+def is_benign(label):
+    return label.astype(str).str.strip().str.upper().isin(BENIGN_NAMES)
 
 
 def features(df):
@@ -95,11 +100,13 @@ def main():
     ap.add_argument("--fpr", type=float, default=0.05)
     ap.add_argument("--max-test", type=int, default=60000)
     ap.add_argument("--baseline", action="store_true")
+    ap.add_argument("--dump", default="predictions.csv", help="per-row predictions file")
     ap.add_argument("--out", default="flow_detector.joblib")
     a = ap.parse_args()
 
     tr = load(a.train)
-    tr = tr[tr["Label"].str.upper() == "BENIGN"].reset_index(drop=True)
+    print("train-file labels:", tr["Label"].value_counts().to_dict())
+    tr = tr[is_benign(tr["Label"])].reset_index(drop=True)
     cut = int(len(tr) * 0.7)
     Xtr, Xcal = features(tr.iloc[:cut]), features(tr.iloc[cut:])
     print(f"benign train={len(Xtr)}  calibration={len(Xcal)}")
@@ -108,7 +115,7 @@ def main():
     te_full = te
     if len(te) > a.max_test:
         te = te.sample(a.max_test, random_state=0).sort_index()
-    y = (te["Label"].str.upper() != "BENIGN").astype(int).values
+    y = (~is_benign(te["Label"])).astype(int).values
     print(f"test flows={len(te)}  attack share={y.mean():.1%}")
     print(te["Label"].value_counts().to_string())
     if y.sum() == 0 or y.sum() == len(y):
@@ -122,7 +129,7 @@ def main():
 
     if a.baseline:   # supervised upper bound: needs labels, time-split inside the test file
         d = te_full.reset_index(drop=True); half = len(d) // 2
-        Xd, yd = features(d), (d["Label"].str.upper() != "BENIGN").astype(int).values
+        Xd, yd = features(d), (~is_benign(d["Label"])).astype(int).values
         tag = "time-split"
         if len(set(yd[:half])) < 2 or len(set(yd[half:])) < 2:   # one class missing in a half
             from sklearn.model_selection import train_test_split
@@ -145,6 +152,12 @@ def main():
     pred = e_te > thr
     per = pd.DataFrame({"Label": te["Label"].values, "flagged": pred}).groupby("Label")["flagged"].mean().round(4)
     print("\nShare of flows flagged per label (benign = false-positive rate, attacks = recall):\n", per.to_string())
+    out = pd.DataFrame({"Label": te["Label"].values, "is_attack_truth": y})
+    for k in s_te:
+        out[k + "_score"] = s_te[k]
+        out[k + "_flag"] = (s_te[k] > np.quantile(s_cal[k], 1 - a.fpr)).astype(int)
+    out["ensemble_score"], out["ensemble_flag"] = e_te, pred.astype(int)
+    out.to_csv(a.dump, index=False)
     joblib.dump({"scaler": sc, "models": models, "cal_scores": s_cal, "ens_threshold": thr,
                  "features": BASE + ENGINEERED}, a.out)
     print(f"\nsaved {a.out} and results.csv")
